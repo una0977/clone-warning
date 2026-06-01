@@ -1,80 +1,60 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
 <head>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: transparent; }
-#clone-warning-banner {
-    display: none;
-    background-color: #fff0f0;
-    border: 1.5px solid #d32f2f;
-    border-left: 5px solid #d32f2f;
-    border-radius: 4px;
-    padding: 10px 14px;
-    margin-bottom: 12px;
-    align-items: flex-start;
-    gap: 10px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-</style>
+  <meta charset="utf-8" />
+  <script src="https://assets.hydrogen.sagittarius.connect.product.adaptavist.com/public/js/bridge.js"></script>
 </head>
+
 <body>
+  <div id="message"></div>
 
-<div id="clone-warning-banner">
-    <span style="color:#d32f2f;font-size:18px;line-height:1.3;">⛔</span>
-    <span style="color:#d32f2f;font-size:13px;line-height:1.5;">
-        <strong>Clone for this issue is disabled.</strong><br>
-        Please use the <strong><em>Clone without parent</em></strong> option.
-    </span>
-</div>
+  <script>
+    async function run() {
+      const issueKey = window.AdaptavistBridgeContext?.context?.issueKey;
 
-<script>
-(function () {
-    function init() {
-        var bridge = window.AdaptavistBridge;
-        var ctx = window.AdaptavistBridgeContext;
+      if (!issueKey) {
+        return;
+      }
 
-        if (!bridge || !ctx || !ctx.context || !ctx.context.issueKey) {
-            setTimeout(init, 300);
-            return;
-        }
+      const issueResponse = await window.AdaptavistBridge.request({
+        url: `/rest/api/3/issue/${issueKey}?fields=parent`,
+        type: "GET"
+      });
 
-        var issueKey = ctx.context.issueKey;
-        var banner = document.getElementById('clone-warning-banner');
+      const issue = JSON.parse(issueResponse.body);
+      const parentKey = issue.fields?.parent?.key;
 
-        function hideBanner() { if (banner) banner.style.display = 'none'; }
-        function showBanner() { if (banner) banner.style.display = 'flex'; }
+      if (!parentKey) {
+        return;
+      }
 
-        bridge.request({
-            url: '/rest/api/3/issue/' + issueKey + '?fields=parent',
-            type: 'GET',
-            success: function (response) {
-                var data = JSON.parse(response);
-                var parent = data && data.fields && data.fields.parent;
-                if (!parent) { hideBanner(); return; }
+      const parentResponse = await window.AdaptavistBridge.request({
+        url: `/rest/api/3/issue/${parentKey}?fields=issuetype,status`,
+        type: "GET"
+      });
 
-                bridge.request({
-                    url: '/rest/api/3/issue/' + parent.key + '?fields=status',
-                    type: 'GET',
-                    success: function (response2) {
-                        var parentData = JSON.parse(response2);
-                        var catKey = parentData.fields
-                            && parentData.fields.status
-                            && parentData.fields.status.statusCategory
-                            && parentData.fields.status.statusCategory.key;
+      const parentIssue = JSON.parse(parentResponse.body);
 
-                        if (catKey === 'done') { showBanner(); } else { hideBanner(); }
-                    },
-                    error: function () { hideBanner(); }
-                });
-            },
-            error: function () { hideBanner(); }
-        });
+      const parentIssueType = parentIssue.fields?.issuetype?.name;
+      const parentStatusCategory = parentIssue.fields?.status?.statusCategory?.key;
+
+      if (parentIssueType === "Epic" && parentStatusCategory === "done") {
+        document.getElementById("message").innerHTML = `
+          <div style="
+            color: #de350b;
+            background: #ffebe6;
+            border: 1px solid #de350b;
+            border-radius: 4px;
+            padding: 10px;
+            font-weight: 600;
+            font-family: Arial, sans-serif;">
+            Clone for this issue is disabled. Please use the <strong>Clone without parent</strong> option.
+          </div>
+        `;
+      }
     }
 
-    init();
-})();
-</script>
-
+    run();
+  </script>
 </body>
 </html>
