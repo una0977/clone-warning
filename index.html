@@ -6,51 +6,77 @@
 </head>
 
 <body>
-  <div id="message"></div>
+  <div id="message" style="font-family: Arial, sans-serif; font-size: 13px;">
+    Loading Clone warning check...
+  </div>
 
   <script>
+    const box = document.getElementById("message");
+
+    function showDebug(text) {
+      box.innerHTML = `
+        <div style="padding:8px; border:1px solid #ccc; background:#f4f5f7;">
+          ${text}
+        </div>
+      `;
+    }
+
+    function showWarning() {
+      box.innerHTML = `
+        <div style="
+          color: #de350b;
+          background: #ffebe6;
+          border: 1px solid #de350b;
+          border-radius: 4px;
+          padding: 10px;
+          font-weight: 600;">
+          Clone for this issue is disabled. Please use the <strong>Clone without parent</strong> option.
+        </div>
+      `;
+    }
+
     async function run() {
-      const issueKey = window.AdaptavistBridgeContext?.context?.issueKey;
+      try {
+        if (!window.AdaptavistBridge || !window.AdaptavistBridgeContext) {
+          showDebug("Adaptavist Bridge not available. This page must be loaded inside a ScriptRunner Cloud Script Fragment.");
+          return;
+        }
 
-      if (!issueKey) {
-        return;
-      }
+        const issueKey = AdaptavistBridgeContext.context.issueKey;
 
-      const issueResponse = await window.AdaptavistBridge.request({
-        url: `/rest/api/3/issue/${issueKey}?fields=parent`,
-        type: "GET"
-      });
+        if (!issueKey) {
+          showDebug("No issue key found in ScriptRunner context.");
+          return;
+        }
 
-      const issue = JSON.parse(issueResponse.body);
-      const parentKey = issue.fields?.parent?.key;
+        const issue = await AdaptavistBridge.request({
+          url: `/rest/api/3/issue/${issueKey}?fields=parent,issuetype,status`,
+          type: "GET"
+        });
 
-      if (!parentKey) {
-        return;
-      }
+        const parentKey = issue.fields?.parent?.key;
 
-      const parentResponse = await window.AdaptavistBridge.request({
-        url: `/rest/api/3/issue/${parentKey}?fields=issuetype,status`,
-        type: "GET"
-      });
+        if (!parentKey) {
+          box.innerHTML = "";
+          return;
+        }
 
-      const parentIssue = JSON.parse(parentResponse.body);
+        const parentIssue = await AdaptavistBridge.request({
+          url: `/rest/api/3/issue/${parentKey}?fields=issuetype,status`,
+          type: "GET"
+        });
 
-      const parentIssueType = parentIssue.fields?.issuetype?.name;
-      const parentStatusCategory = parentIssue.fields?.status?.statusCategory?.key;
+        const parentIssueType = parentIssue.fields?.issuetype?.name;
+        const parentStatusCategory = parentIssue.fields?.status?.statusCategory?.key;
 
-      if (parentIssueType === "Epic" && parentStatusCategory === "done") {
-        document.getElementById("message").innerHTML = `
-          <div style="
-            color: #de350b;
-            background: #ffebe6;
-            border: 1px solid #de350b;
-            border-radius: 4px;
-            padding: 10px;
-            font-weight: 600;
-            font-family: Arial, sans-serif;">
-            Clone for this issue is disabled. Please use the <strong>Clone without parent</strong> option.
-          </div>
-        `;
+        if (parentIssueType === "Epic" && parentStatusCategory === "done") {
+          showWarning();
+        } else {
+          box.innerHTML = "";
+        }
+
+      } catch (e) {
+        showDebug("Error: " + e.message);
       }
     }
 
