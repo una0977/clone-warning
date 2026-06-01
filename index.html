@@ -1,6 +1,60 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
+<head>
+  <meta charset="utf-8" />
+  <script src="https://assets.hydrogen.sagittarius.connect.product.adaptavist.com/public/js/bridge.js"></script>
+</head>
+
 <body>
-<h1 style="color:red;">HELLO FROM GITHUB PAGES</h1>
+  <div id="message"></div>
+
+  <script>
+    async function run() {
+      const issueKey = window.AdaptavistBridgeContext?.context?.issueKey;
+
+      if (!issueKey) {
+        return;
+      }
+
+      const issueResponse = await window.AdaptavistBridge.request({
+        url: `/rest/api/3/issue/${issueKey}?fields=parent`,
+        type: "GET"
+      });
+
+      const issue = JSON.parse(issueResponse.body);
+      const parentKey = issue.fields?.parent?.key;
+
+      if (!parentKey) {
+        return;
+      }
+
+      const parentResponse = await window.AdaptavistBridge.request({
+        url: `/rest/api/3/issue/${parentKey}?fields=issuetype,status`,
+        type: "GET"
+      });
+
+      const parentIssue = JSON.parse(parentResponse.body);
+
+      const parentIssueType = parentIssue.fields?.issuetype?.name;
+      const parentStatusCategory = parentIssue.fields?.status?.statusCategory?.key;
+
+      if (parentIssueType === "Epic" && parentStatusCategory === "done") {
+        document.getElementById("message").innerHTML = `
+          <div style="
+            color: #de350b;
+            background: #ffebe6;
+            border: 1px solid #de350b;
+            border-radius: 4px;
+            padding: 10px;
+            font-weight: 600;
+            font-family: Arial, sans-serif;">
+            Clone for this issue is disabled. Please use the <strong>Clone without parent</strong> option.
+          </div>
+        `;
+      }
+    }
+
+    run();
+  </script>
 </body>
 </html>
